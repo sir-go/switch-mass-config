@@ -1,2 +1,4 @@
 .idea/*
 mibs
+venv
+.venv

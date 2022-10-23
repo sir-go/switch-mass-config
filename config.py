@@ -7,4 +7,5 @@ switch_auth = {
 
 scan_workers = 10
 root_sw_mac = ''  # server MAC for uplink detection
+targets = ()
 ignored_ips = ()

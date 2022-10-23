@@ -28,6 +28,5 @@ def proc(qi, lck=None):
 
 if __name__ == '__main__':
     scn = NetScaner()
-    ips = []
-    if ips:
-        scn.scan(objlist=ips, workers=scan_workers, task=proc)
+    if targets:
+        scn.scan(objlist=targets, workers=scan_workers, task=proc)

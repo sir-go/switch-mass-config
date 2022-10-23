@@ -22,7 +22,7 @@ class NetScaner:
 
             else:
                 # fill input queue by ip's
-                for ip_addr in ipv4subnet.iterhosts():
+                for ip_addr in ipv4subnet.hosts():
                     self.q_in.put(str(ip_addr))
         elif objlist:
             for obj in objlist:
