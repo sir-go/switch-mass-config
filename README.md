@@ -1,13 +1,11 @@
 [![Tests](https://github.com/sir-go/switch-mass-config/actions/workflows/python-app.yml/badge.svg)](https://github.com/sir-go/switch-mass-config/actions/workflows/python-app.yml)
 
-## Multiple switches reconfiguring tool
-
+# Multiple switches reconfiguring tool
 A tool for reconfiguring multiple d-link switches at the same time.
 
 `swlib` - the library implements Telnet and SNMP connection interfaces to switch
-___
-### Configure
 
+## Configure
 Edit the `config.py` file before run
 
 ```python
@@ -36,11 +34,9 @@ def do(sw: Switch, lock: Lock):
 
 All per-device configuration logic must be described in 
 the worker function `do(sw, lock)`
-___
-### Install -> Tests -> Run
 
-#### Standalone
-
+## Install -> Tests -> Run
+### Standalone
 > The system must have the `net-snmp` package
 
 ```bash
@@ -49,8 +45,8 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 python -m pytest && python run.py
 ```
-#### Docker
 
+### Docker
 > the docker bridge network must be different from that where devices are
 
 ```bash
