@@ -1,63 +1,54 @@
-# -*-coding:utf-8-*-
 from netsnmp import VarList, Varbind
-from netsnmp import Session as snmp_Session
+from netsnmp import Session
+from typing import Iterable
 
 
-class SnmpException(Exception):
-    def __init__(self, value):
-        Exception.__init__(self)
-        self.parameter = value
-
-    def __str__(self):
-        return repr(self.parameter)
+def mac_dec_to_hex(dec_bytes: Iterable[int]) -> str:
+    return ''.join(map(lambda x: f'{int(x):02x}', dec_bytes))
 
 
-class SnmpTerminal(object):
-    def __init__(self, ip, w_com='private', ver=2, timeout=2, retries=3):
+class SnmpTerminal:
+    def __init__(self,
+                 ip: str,
+                 w_com: str = 'private',
+                 ver: int = 2,
+                 timeout: int = 2,
+                 retries: int = 3,
+                 **args):
         self.ip = ip
-        self.w_com = w_com
-        self.retries = retries
-        self.snmp_con = snmp_Session(
-            DestHost=self.ip,
+        self._t = Session(
+            DestHost=ip,
             Version=ver,
             Timeout=int(timeout * 1000000),
             Retries=retries,
-            Community=self.w_com,
-
-        )
-        self._mac_dec2hex = lambda macdec: ''.join(map(lambda x: '%0.2x' % int(x), macdec))
+            Community=w_com,
+            **args)
 
     def __repr__(self):
         return '< snmp_terminal object ip:{}>'.format(self.ip)
 
-    def get_macs(self):
-        res = []
-        for macaddr in self.snmp_con.walk(VarList(Varbind('iso.3.6.1.2.1.2.2.1.6'))):
-            if macaddr:
-                mac = self._mac_notnull(macaddr)
-                if mac and mac not in res:
-                    res.append(macaddr.encode('hex'))
+    def get_macs(self) -> set[str]:
+        res = set()
+        for macaddr in self._t.walk(
+                VarList(Varbind('iso.3.6.1.2.1.2.2.1.6'))):
+            if not macaddr:
+                continue
+            mac = mac_dec_to_hex(macaddr)
+            if mac == '0' * 12:
+                continue
+            res.add(mac)
         return res
 
-    @staticmethod
-    def _mac_notnull(mac):
-        mac_decoded = '%012.x' % int(mac.encode('hex'), 16)
-        if mac_decoded and int(mac_decoded, 16):
-            return mac_decoded
-        else:
-            return None
-
-    def get_mac_table(self):
+    def get_mac_table(self) -> dict:
         res = {}
         vb_mac_table = Varbind('iso.3.6.1.2.1.17.7.1.2.2.1.2')
         vl_mac_table = VarList(vb_mac_table)
-        port_numbers_values = self.snmp_con.walk(vl_mac_table)
+        port_numbers_values = self._t.walk(vl_mac_table)
         idx = 0
-        for varbind in vl_mac_table:
-            port_numbers_key_splited = varbind.tag.split('.')[-7:]
-            # vlan = port_numbers_key_splited[0]
-            mac_dec = port_numbers_key_splited[1:]
-            mac = '%012.x' % int(self._mac_dec2hex(mac_dec), 16)
+        for vb in vl_mac_table:
+            port_numbers_key_split = vb.tag.split('.')[-7:]
+            mac_dec = port_numbers_key_split[1:]
+            mac = mac_dec_to_hex(mac_dec)
             port = port_numbers_values[idx]
             idx += 1
             if port != "0":
@@ -65,82 +56,77 @@ class SnmpTerminal(object):
                     res[port] = []
                 if mac and int(mac, 16) and mac not in res[port]:
                     res[port].append(mac)
-        self.retries -= 1
-        if self.retries:
+        self.Retries -= 1
+        if self.Retries:
             res = self.get_mac_table()
         return res
 
-    def snmp_get_ifspeed_table(self):
+    def get_ifspeed_table(self) -> dict:
         res = {}
         vb = Varbind('iso.3.6.1.2.1.2.2.1.5')
         vl = VarList(vb)
-        values = self.snmp_con.walk(vl)
-        for vbind in vl:
+        for vbind in self._t.walk(vl):
             res[vbind.iid] = vbind.val
         return res
 
-    def location_get(self):
-        res = {}
-        vb = Varbind('sysLocation.0')
+    def get_location(self) -> str:
+        vb = Varbind('iso.1.3.6.1.2.1.1.6.0')
         vl = VarList(vb)
-        values = self.snmp_con.get(vl)
-        for vbind in vl:
+        for vbind in self._t.get(vl):
             return vbind.val
 
-    def location_set(self, location, check=False):
-        values = self.snmp_con.set((Varbind('sysLocation', 0, location, 'OCTETSTR'),))
+    def set_location(self, location, check=False):
+        self._t.set((Varbind('1.3.6.1.2.1.1.6', 0, location, 'OCTETSTR'),))
         if check:
-            return self.location_get()
+            return self.get_location()
 
-    def get_if_indexes(self):
+    def get_if_indexes(self) -> list:
         vb = Varbind('iso.3.6.1.2.1.2.2.1.1')
         vl = VarList(vb)
-        return self.snmp_con.walk(vl)
+        return self._t.walk(vl)
 
-    def get_ports_by_types(self):
+    def get_ports_by_types(self) -> dict:
         if_indexes = self.get_if_indexes()
         res = {}
         vb = Varbind('iso.3.6.1.2.1.2.2.1.3')
         vl = VarList(vb)
-        types = self.snmp_con.walk(vl)
+        types = self._t.walk(vl)
 
-        for iftp in zip(if_indexes, types):
-            if iftp[1] not in res:
-                res[iftp[1]] = []
-            res[iftp[1]].append(iftp[0])
+        for if_type in zip(if_indexes, types):
+            if if_type[1].val not in res:
+                res[if_type[1].val] = []
+            res[if_type[1].val].append(if_type[0].val)
         return res
 
-    def set_port_alias(self, port_num, alias):
-        self.snmp_con.set((Varbind('iso.3.6.1.2.1.31.1.1.1.18', int(port_num), alias, 'OCTETSTR'),))
+    def set_port_alias(self, port_num: int, alias: str):
+        self._t.set((Varbind(
+            'iso.3.6.1.2.1.31.1.1.1.18', int(port_num), alias, 'OCTETSTR'),))
 
-    def get_serial_number(self):
+    def get_serial_number(self) -> str:
         vb = Varbind('iso.3.6.1.4.1.171.12.1.1.12')
         vl = VarList(vb)
-        sn = self.snmp_con.walk(vl)
+        sn = self._t.walk(vl)
         if sn:
-            sn = sn[0]
-        return sn
+            return sn[0].val
 
-    def get_firmware(self):
+    def get_firmware(self) -> (str, str):
         # firmware
         vb = Varbind('iso.3.6.1.2.1.16.19.2')
         vl = VarList(vb)
-        fw = self.snmp_con.walk(vl)
+        fw = self._t.walk(vl)
         if fw:
-            fw = fw[0]
+            fw = fw[0].val
 
         # revision
         vb = Varbind('iso.3.6.1.2.1.16.19.3')
         vl = VarList(vb)
-        rv = self.snmp_con.walk(vl)
+        rv = self._t.walk(vl)
         if rv:
-            rv = rv[0]
+            rv = rv[0].val
         return fw, rv
 
-    def get_descr(self):
-        res = {}
-        vb = Varbind('sysDescr.0')
+    def get_descr(self) -> str:
+        vb = Varbind('.1.3.6.1.2.1.1.1.0')
         vl = VarList(vb)
-        values = self.snmp_con.get(vl)
-        for vbind in vl:
+        for vbind in self._t.get(vl):
             return vbind.val

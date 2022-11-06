@@ -1,27 +1,57 @@
 ## Multiple switches reconfiguring tool
 
-`swlib` - the library implements Telnet and SNMP interfaces to switch
+A tool for reconfiguring multiple d-link switches at the same time.
 
+`swlib` - the library implements Telnet and SNMP connection interfaces to switch
+___
 ### Configure
+
+Edit the `config.py` file before run
+
 ```python
-switch_auth = {         # switch credentials
-    'login': '',        # telnet login
-    'passwd': '',       # telnet password
-    'snmp_public': '',  # read SNMP community
-    'snmp_private': ''  # write SNMP community
-}
-scan_workers = 10       # parallel processes amount
-root_sw_mac = ''        # server MAC for uplink detection
-targets = ()            # list of switches networks (CIDRs)
-ignored_ips = ()        # list of ignored IP
+conf = dict(
+    scan_workers=10,            # runners amount
+    root_sw_mac='',             # server MAC for uplink detection
+    targets=[],                 # switches IP
+    ignored_ips=[],             # ignored IP
 
+    common_sw_params=dict(
+        login='',                   # telnet username
+        password='',                # telnet password
+        # snmp_public='public',     # snmp read-only community
+        # snmp_private='private',   # snmp write community
+        # telnet_timeout=5,         # telnet waiting timeout in sec
+        # snmp_timeout=5,           # snmp waiting timeout in sec
+    )
+)
+
+# what to do with each device
+def do(sw: Switch, lock: Lock):
+    descr = sw.get_descr()
+    with lock:
+        print(descr if descr else sw.log)
 ```
-Tasks must be described in the worker function `run.proc()`
 
-### Install & run
+All per-device configuration logic must be described in 
+the worker function `do(sw, lock)`
+___
+### Install -> Tests -> Run
+
+#### Standalone
+
+> The system must have the `net-snmp` package
+
 ```bash
 virtualenv venv
 source ./venv/bin/activate
 pip install -r requirements.txt
-python run.py
+python -m pytest && python run.py
+```
+#### Docker
+
+> the docker bridge network must be different from that where devices are
+
+```bash
+docker build . -t sw-mass-cfg
+docker run --rm -it -v ${PWD}/config.py:/app/config.py:ro sw-mass-cfg
 ```

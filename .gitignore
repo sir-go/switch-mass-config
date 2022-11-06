@@ -2,3 +2,4 @@
 mibs
 venv
 .venv
+*-prod.*

@@ -1,32 +1,22 @@
-#!/usr/bin/env python
-# -*-coding:utf-8-*-
-
 from swlib.net_scaner import NetScaner
+from config import conf, do
 from swlib.class_switch import Switch
-from config import *
 
 
 def proc(qi, lck=None):
     while True:
         ip = qi.get()
-        lck.acquire()
-        print(str(qi.qsize() + 1), ip)
-        lck.release()
-
-        sw = Switch(ip, switch_auth)
-
-        if sw.telnet_available:
-            script = '''
-            '''
-            result = sw.telnet_exec(script, False)
-
-            lck.acquire()
-            print(sw, result)
-            lck.release()
+        do(Switch(ip, **conf['common_sw_params']), lck)
         qi.task_done()
 
 
 if __name__ == '__main__':
     scn = NetScaner()
-    if targets:
-        scn.scan(objlist=targets, workers=scan_workers, task=proc)
+    if len(conf['targets']) < 1:
+        print('no targets are set, edit the config.py please')
+        exit(0)
+
+    scn.scan(
+        targets=conf['targets'],
+        workers_amount=conf['scan_workers'],
+        task=proc)
