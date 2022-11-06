@@ -1,3 +1,5 @@
+[![Tests](https://github.com/sir-go/switch-mass-config/actions/workflows/python-app.yml/badge.svg)](https://github.com/sir-go/switch-mass-config/actions/workflows/python-app.yml)
+
 ## Multiple switches reconfiguring tool
 
 A tool for reconfiguring multiple d-link switches at the same time.
